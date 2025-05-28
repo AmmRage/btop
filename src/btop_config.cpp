@@ -405,6 +405,11 @@ namespace Config {
 	vector<string> preset_list = {"cpu:0:default,mem:0:default,net:0:default,proc:0:default"};
 	int current_preset = -1;
 
+	// process sorter
+	// 0=pid, 1=program, 2=command, 3=threads, 4=user, 5=memory, 6=cpu lazy, 7=cpu direct
+	int process_sorter = 0;
+	bool process_sorter_ascending = true;
+
 	bool presetsValid(const string& presets) {
 		vector<string> new_presets = {preset_list.at(0)};
 

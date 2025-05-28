@@ -58,6 +58,8 @@ namespace Config {
 	extern vector<string> preset_list;
 	extern vector<string> available_batteries;
 	extern int current_preset;
+	extern int process_sorter;
+	extern bool process_sorter_ascending;
 
 	constexpr int ONE_DAY_MILLIS = 1000 * 60 * 60 * 24;
 

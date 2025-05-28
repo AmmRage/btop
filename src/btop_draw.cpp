@@ -1549,6 +1549,64 @@ namespace Proc {
 		return (not changed ? -1 : selected);
 	}
 
+	bool compareProcessInfoByPid(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.pid < b.pid;
+		else
+			return a.pid > b.pid;
+	}
+
+	bool compareProcessInfoByProgram(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.name.substr(0,1) < b.name.substr(0,1);
+		else
+			return a.name.substr(0,1) > b.name.substr(0,1);
+	}
+
+	// short_cmd
+	bool compareProcessInfoByCommand(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.short_cmd.substr(0,1) < b.short_cmd.substr(0,1);
+		else
+			return a.short_cmd.substr(0,1) > b.short_cmd.substr(0,1);
+	}
+
+	bool compareProcessInfoByThreads(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.threads < b.threads;
+		else
+			return a.threads > b.threads;
+	}
+
+	// user
+	bool compareProcessInfoByUser(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.user.substr(0,1) < b.user.substr(0,1);
+		else
+			return a.user.substr(0,1) > b.user.substr(0,1);
+	}
+
+	bool compareProcessInfoByMemory(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.mem < b.mem;
+		else
+			return a.mem > b.mem;
+	}
+
+	bool compareProcessInfoByCpuLazy(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.cpu_p < b.cpu_p;
+		else
+			return a.cpu_p > b.cpu_p;
+	}
+
+	bool compareProcessInfoByCpuDirect(const proc_info& a, const proc_info& b) {
+		if (Config::process_sorter_ascending)
+			return a.cpu_p < b.cpu_p;
+		else
+			return a.cpu_p > b.cpu_p;
+	}
+
 	string draw(const vector<proc_info>& plist, bool force_redraw, bool data_same) {
 		if (Runner::stopping) return "";
 		auto proc_tree = Config::getB("proc_tree");
@@ -1798,28 +1856,59 @@ namespace Proc {
 
 		//* Iteration over processes
 		int lc = 0;
-		for (int n=0; auto& p : plist) {
-			if (p.filtered or (proc_tree and p.tree_index == plist.size()) or n++ < start) continue;
+
+		std::vector<proc_info> sorted_plist = plist;
+
+		switch (Config::process_sorter) {
+			case 0: // 0=pid
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByPid);
+				break;
+			case 1: // 1=program
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByProgram);
+				break;
+			case 2: // 2=command
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByCommand);
+				break;
+			case 3: // 3=threads
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByThreads);
+				break;
+			case 4: // 4=user
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByUser);
+				break;
+			case 5: // 5=memory
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByMemory);
+				break;
+			case 6: // 6=cpu lazy
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByCpuLazy);
+				break;
+			case 7: // 7=cpu direct
+				std::sort(sorted_plist.begin(), sorted_plist.end(), compareProcessInfoByCpuDirect);
+				break;
+			default: ;
+		}
+
+		for (int n=0; auto& proc_info : sorted_plist) {
+			if (proc_info.filtered or (proc_tree and proc_info.tree_index == sorted_plist.size()) or n++ < start) continue;
 			bool is_selected = (lc + 1 == selected);
 			if (is_selected) {
-				selected_pid = (int)p.pid;
-				selected_name = p.name;
-				selected_depth = p.depth;
+				selected_pid = (int)proc_info.pid;
+				selected_name = proc_info.name;
+				selected_depth = proc_info.depth;
 			}
 
 			//? Update graphs for processes with above 0.0% cpu usage, delete if below 0.1% 10x times
-			bool has_graph = show_graphs ? p_counters.contains(p.pid) : false;
-			if (show_graphs and ((p.cpu_p > 0 and not has_graph) or (not data_same and has_graph))) {
+			bool has_graph = show_graphs ? p_counters.contains(proc_info.pid) : false;
+			if (show_graphs and ((proc_info.cpu_p > 0 and not has_graph) or (not data_same and has_graph))) {
 				if (not has_graph) {
-					p_graphs[p.pid] = Draw::Graph{5, 1, "", {}, graph_symbol};
-					p_counters[p.pid] = 0;
+					p_graphs[proc_info.pid] = Draw::Graph{5, 1, "", {}, graph_symbol};
+					p_counters[proc_info.pid] = 0;
 				}
-				else if (p.cpu_p < 0.1 and ++p_counters[p.pid] >= 10) {
-					if (p_graphs.contains(p.pid)) p_graphs.erase(p.pid);
-					p_counters.erase(p.pid);
+				else if (proc_info.cpu_p < 0.1 and ++p_counters[proc_info.pid] >= 10) {
+					if (p_graphs.contains(proc_info.pid)) p_graphs.erase(proc_info.pid);
+					p_counters.erase(proc_info.pid);
 				}
 				else
-					p_counters[p.pid] = 0;
+					p_counters[proc_info.pid] = 0;
 			}
 
 			out += Fx::reset;
@@ -1836,7 +1925,7 @@ namespace Proc {
 				if (proc_colors) {
 					end = Theme::c("main_fg") + Fx::ub;
 					array<string, 3> colors;
-					for (int i = 0; int v : {(int)round(p.cpu_p), (int)round(p.mem * 100 / totalMem), (int)p.threads / 3}) {
+					for (int i = 0; int v : {(int)round(proc_info.cpu_p), (int)round(proc_info.mem * 100 / totalMem), (int)proc_info.threads / 3}) {
 						if (proc_gradient) {
 							int val = (min(v, 100) + 100) - calc * 100 / select_max;
 							if (val < 100) colors[i++] = Theme::g("proc_color").at(max(0, val));
@@ -1856,48 +1945,48 @@ namespace Proc {
 				}
 			}
 
-			const auto san_cmd = replace_ascii_control(p.cmd);
+			const auto san_cmd = replace_ascii_control(proc_info.cmd);
 
-			if (not p_wide_cmd.contains(p.pid)) p_wide_cmd[p.pid] = ulen(san_cmd) != ulen(san_cmd, true);
+			if (not p_wide_cmd.contains(proc_info.pid)) p_wide_cmd[proc_info.pid] = ulen(san_cmd) != ulen(san_cmd, true);
 
 			//? Normal view line
 			if (not proc_tree) {
 				out += Mv::to(y+2+lc, x+1)
-					+ g_color + rjust(to_string(p.pid), 8) + ' '
-					+ c_color + ljust(p.name, prog_size, true) + ' ' + end
-					+ (cmd_size > 0 ? g_color + ljust(san_cmd, cmd_size, true, p_wide_cmd[p.pid]) + Mv::to(y+2+lc, x+11+prog_size+cmd_size) + ' ' : "");
+					+ g_color + rjust(to_string(proc_info.pid), 8) + ' '
+					+ c_color + ljust(proc_info.name, prog_size, true) + ' ' + end
+					+ (cmd_size > 0 ? g_color + ljust(san_cmd, cmd_size, true, p_wide_cmd[proc_info.pid]) + Mv::to(y+2+lc, x+11+prog_size+cmd_size) + ' ' : "");
 			}
 			//? Tree view line
 			else {
-				const string prefix_pid = p.prefix + to_string(p.pid);
+				const string prefix_pid = proc_info.prefix + to_string(proc_info.pid);
 				int width_left = tree_size;
 				out += Mv::to(y+2+lc, x+1) + g_color + uresize(prefix_pid, width_left) + ' ';
 				width_left -= ulen(prefix_pid);
 				if (width_left > 0) {
-					out += c_color + uresize(p.name, width_left - 1) + end + ' ';
-					width_left -= (ulen(p.name) + 1);
+					out += c_color + uresize(proc_info.name, width_left - 1) + end + ' ';
+					width_left -= (ulen(proc_info.name) + 1);
 				}
 				if (width_left > 7) {
-					const string_view cmd = width_left > 40 ? rtrim(san_cmd) : p.short_cmd;
-					if (not cmd.empty() and cmd != p.name) {
-						out += g_color + '(' + uresize(string{cmd}, width_left - 3, p_wide_cmd[p.pid]) + ") ";
+					const string_view cmd = width_left > 40 ? rtrim(san_cmd) : proc_info.short_cmd;
+					if (not cmd.empty() and cmd != proc_info.name) {
+						out += g_color + '(' + uresize(string{cmd}, width_left - 3, p_wide_cmd[proc_info.pid]) + ") ";
 						width_left -= (ulen(string{cmd}, true) + 3);
 					}
 				}
 				out += string(max(0, width_left), ' ') + Mv::to(y+2+lc, x+2+tree_size);
 			}
 			//? Common end of line
-			string cpu_str = to_string(p.cpu_p);
-			if (p.cpu_p < 10 or (p.cpu_p >= 100 and p.cpu_p < 1000)) cpu_str.resize(3);
-			else if (p.cpu_p >= 10'000) {
-				cpu_str = to_string(p.cpu_p / 1000);
+			string cpu_str = to_string(proc_info.cpu_p);
+			if (proc_info.cpu_p < 10 or (proc_info.cpu_p >= 100 and proc_info.cpu_p < 1000)) cpu_str.resize(3);
+			else if (proc_info.cpu_p >= 10'000) {
+				cpu_str = to_string(proc_info.cpu_p / 1000);
 				cpu_str.resize(3);
 				if (cpu_str.ends_with('.')) cpu_str.pop_back();
 				cpu_str += "k";
 			}
-			string mem_str = (mem_bytes ? floating_humanizer(p.mem, true) : "");
+			string mem_str = (mem_bytes ? floating_humanizer(proc_info.mem, true) : "");
 			if (not mem_bytes) {
-				double mem_p = clamp((double)p.mem * 100 / totalMem, 0.0, 100.0);
+				double mem_p = clamp((double)proc_info.mem * 100 / totalMem, 0.0, 100.0);
 				mem_str = to_string(mem_p);
 				if (mem_str.size() < 4)	mem_str = "0";
 				else mem_str.resize((mem_p < 10 or mem_p >= 100 ? 3 : 4));
@@ -1906,18 +1995,18 @@ namespace Proc {
 
 			// Shorten process thread representation when larger than 5 digits: 10000 -> 10K ...
 			const std::string proc_threads_string = [&] {
-				if (p.threads > 9999) {
-					return std::to_string(p.threads / 1000) + 'K';
+				if (proc_info.threads > 9999) {
+					return std::to_string(proc_info.threads / 1000) + 'K';
 				} else {
-					return std::to_string(p.threads);
+					return std::to_string(proc_info.threads);
 				}
 			}();
 
 			out += (thread_size > 0 ? t_color + rjust(proc_threads_string, thread_size) + ' ' + end : "" )
-				+ g_color + ljust((cmp_greater(p.user.size(), user_size) ? p.user.substr(0, user_size - 1) + '+' : p.user), user_size) + ' '
+				+ g_color + ljust((cmp_greater(proc_info.user.size(), user_size) ? proc_info.user.substr(0, user_size - 1) + '+' : proc_info.user), user_size) + ' '
 				+ m_color + rjust(mem_str, 5) + end + ' '
 				+ (is_selected ? "" : Theme::c("inactive_fg")) + (show_graphs ? graph_bg * 5: "")
-				+ (p_graphs.contains(p.pid) ? Mv::l(5) + c_color + p_graphs.at(p.pid)({(p.cpu_p >= 0.1 and p.cpu_p < 5 ? 5ll : (long long)round(p.cpu_p))}, data_same) : "") + end + ' '
+				+ (p_graphs.contains(proc_info.pid) ? Mv::l(5) + c_color + p_graphs.at(proc_info.pid)({(proc_info.cpu_p >= 0.1 and proc_info.cpu_p < 5 ? 5ll : (long long)round(proc_info.cpu_p))}, data_same) : "") + end + ' '
 				+ c_color + rjust(cpu_str, 4) + "  " + end;
 			if (lc++ > height - 5) break;
 		}
@@ -1947,15 +2036,15 @@ namespace Proc {
 			counter = 0;
 
 			std::erase_if(p_graphs, [&](const auto& pair) {
-				return rng::find(plist, pair.first, &proc_info::pid) == plist.end();
+				return rng::find(sorted_plist, pair.first, &proc_info::pid) == sorted_plist.end();
 			});
 
 			std::erase_if(p_counters, [&](const auto& pair) {
-				return rng::find(plist, pair.first, &proc_info::pid) == plist.end();
+				return rng::find(sorted_plist, pair.first, &proc_info::pid) == sorted_plist.end();
 			});
 
 			std::erase_if(p_wide_cmd, [&](const auto& pair) {
-				return rng::find(plist, pair.first, &proc_info::pid) == plist.end();
+				return rng::find(sorted_plist, pair.first, &proc_info::pid) == sorted_plist.end();
 			});
 		}
 

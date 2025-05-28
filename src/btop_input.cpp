@@ -27,6 +27,9 @@ tab-size = 4
 #include <utility>
 
 #include "btop_input.hpp"
+
+#include <iostream>
+
 #include "btop_tools.hpp"
 #include "btop_config.hpp"
 #include "btop_shared.hpp"
@@ -110,6 +113,7 @@ namespace Input {
 			ssize_t count = 0;
 			while((count = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
 				input.append(std::string_view(buf, count));
+				// Logger::warning(fmt::format("Input read: {}", input));
 			}
 
 			return true;
@@ -120,13 +124,16 @@ namespace Input {
 
 	string get() {
 		string key = input;
+		// Logger::warning(fmt::format("get key: {}, length: {}", key, ulen(key)));
 		if (not key.empty()) {
 			//? Remove escape code prefix if present
 			if (key.substr(0, 2) == Fx::e) {
 				key.erase(0, 1);
+				// Logger::warning(fmt::format("Remove escape code prefix if present get key: {}", key));
 			}
 			//? Detect if input is an mouse event
 			if (key.starts_with("[<")) {
+				// Logger::warning(fmt::format("Detect if input is an mouse event get key: {}", key));
 				std::string_view key_view = key;
 				string mouse_event;
 				if (key_view.starts_with("[<0;") and key_view.find('M') != std::string_view::npos) {
@@ -178,16 +185,32 @@ namespace Input {
 				}
 
 			}
-			else if (auto it = Key_escapes.find(key); it != Key_escapes.end())
+			else if (auto it = Key_escapes.find(key); it != Key_escapes.end()) {
 				key = it->second;
-			else if (ulen(key) > 1)
+				// Logger::warning(fmt::format("Key_escapes.find(key); get key: {}", key));
+			}
+			else if (key.substr(1, 2) == "OP") {
+				key = "F1";
+			}
+			else if (key.substr(1, 2) == "OQ") {
+				key = "F2";
+			}
+			else if (key.substr(1, 2) == "OR") {
+				key = "F3";
+			}
+			else if (key.substr(1, 2) == "OS") {
+				key = "F4";
+			}
+			else if (ulen(key) > 1) {
 				key.clear();
-
+				// Logger::warning(fmt::format("ulen(key) > 1 get key: {}", key));
+			}
 			if (not key.empty()) {
 				history.push_back(key);
 				history.pop_front();
 			}
 		}
+		// Logger::warning(fmt::format("return key: {}", key));
 		return key;
 	}
 
@@ -205,6 +228,7 @@ namespace Input {
 	}
 
 	void process(const std::string_view key) {
+		// Logger::warning(fmt::format("process read key: {}", key));
 		if (key.empty()) return;
 		try {
 			auto filtering = Config::getB("proc_filtering");
@@ -216,6 +240,54 @@ namespace Input {
 				bool keep_going = false;
 				if (key == "q") {
 					clean_quit(0);
+				}
+				else if (is_in(key, "F1", "f1")) {
+					Config::process_sorter = 0;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F2", "f2")) {
+					Config::process_sorter = 1;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F3", "f3")) {
+					Config::process_sorter = 2;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F4", "f4")) {
+					Config::process_sorter = 3;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F5", "f5")) {
+					Config::process_sorter = 4;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F6", "f6")) {
+					Config::process_sorter = 5;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F7", "f7")) {
+					Config::process_sorter = 6;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
+				}
+				else if (is_in(key, "F8", "f8")) {
+					Config::process_sorter = 7;
+					Config::process_sorter_ascending = !Config::process_sorter_ascending;
+					// Logger::info(fmt::format("Set process sorter to {} and ascending to {}", Config::process_sorter, Config::process_sorter_ascending));
+					return;
 				}
 				else if (is_in(key, "escape", "m")) {
 					Menu::show(Menu::Menus::Main);
